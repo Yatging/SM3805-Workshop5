@@ -1,0 +1,142 @@
+// 动态表情栅格动画：4帧表情通过条纹移动切换
+int frameCount = 4;       // 表情总帧数
+int stripeWidth = frameCount; // 条纹宽度=帧数（确保每帧对应一列）
+float offset = 0;         // 条纹偏移量（控制动画）
+float speed = 0.3;        // 移动速度
+
+void setup() {
+  size(400, 400); // 窗口大小（400x400，方便按4像素列划分）
+  frameRate(60);  // 高帧率保证流畅
+}
+
+void draw() {
+  background(255); // 白色背景
+  
+  // 1. 绘制交错排列的4帧表情（每列对应一帧，按周期重复）
+  drawInterleavedFaces();
+  
+  // 2. 绘制移动的黑色条纹（遮挡部分列，显示对应帧）
+  drawMovingStripes();
+  
+  // 3. 显示操作提示
+  fill(0);
+  textSize(14);
+  text("鼠标左右移动：改变速度 | 点击：反转方向", 10, 20);
+  text("表情变化：微笑→惊讶→难过→普通", 10, 40);
+  
+  // 更新偏移量（控制条纹移动）
+  offset += speed;
+  if (offset > frameCount) offset = 0; // 循环偏移，避免数值过大
+}
+
+// 核心：将4帧表情按列交错排列（每4列循环一次：帧0→帧1→帧2→帧3）
+void drawInterleavedFaces() {
+  noStroke();
+  for (int x = 0; x < width; x++) { // 逐列绘制
+    // 每列对应一帧（x除以4的余数决定当前列属于哪一帧）
+    int frame = x % frameCount;
+    
+    // 根据当前列所属帧，绘制对应表情的列
+    fill(255, 220, 180); // 肤色
+    rect(x, 0, 1, height); // 绘制当前列的肤色背景
+    
+    // 绘制该帧表情的眼睛和嘴巴（按列绘制，只画当前x列的内容）
+    drawFaceFrame(frame, x);
+  }
+}
+
+// 绘制单帧表情的指定列（x是当前列的横坐标）
+void drawFaceFrame(int frame, int x) {
+  // 脸的范围：居中，直径300px
+  int faceCenterX = width/2;
+  int faceCenterY = height/2;
+  int faceRadius = 150;
+  
+  // 判断当前x列是否在脸的范围内（只在脸的宽度内绘制五官）
+  if (x < faceCenterX - faceRadius || x > faceCenterX + faceRadius) {
+    return; // 不在脸范围内，不画五官
+  }
+  
+  // 绘制眼睛（左右眼，每帧位置固定）
+  fill(0); // 黑色眼睛
+  // 左眼：x坐标在 faceCenterX-50 左右，y坐标 faceCenterY-30
+  if (abs(x - (faceCenterX - 50)) < 10) { // 左眼宽度10px
+    rect(x, faceCenterY - 30, 1, 20); // 左眼高度20px
+  }
+  // 右眼：x坐标在 faceCenterX+50 左右
+  if (abs(x - (faceCenterX + 50)) < 10) { // 右眼宽度10px
+    rect(x, faceCenterY - 30, 1, 20); // 右眼高度20px
+  }
+  
+  // 绘制嘴巴（每帧不同）
+  switch(frame) {
+    case 0: // 微笑（上弯曲线）
+      if (yInCurve(x, faceCenterX, faceCenterY + 50, 80, -0.01)) {
+        fill(0);
+        rect(x, getYPos(x, faceCenterX, faceCenterY + 50, 80, -0.01), 1, 5);
+      }
+      break;
+    case 1: // 惊讶（圆形嘴）
+      int mouthCenterY = faceCenterY + 60;
+      int mouthRadius = 30;
+      // 计算当前x是否在圆形嘴的范围内
+      int dx = x - faceCenterX;
+      int dy = mouthCenterY - (faceCenterY + 60);
+      if (dx*dx + dy*dy < mouthRadius*mouthRadius) {
+        fill(0);
+        rect(x, mouthCenterY - sqrt(mouthRadius*mouthRadius - dx*dx), 1, 2);
+      }
+      break;
+    case 2: // 难过（下弯曲线）
+      if (yInCurve(x, faceCenterX, faceCenterY + 70, 80, 0.01)) {
+        fill(0);
+        rect(x, getYPos(x, faceCenterX, faceCenterY + 70, 80, 0.01), 1, 5);
+      }
+      break;
+    case 3: // 普通（直线嘴）
+      int mouthY = faceCenterY + 60;
+      if (x > faceCenterX - 40 && x < faceCenterX + 40) { // 嘴宽80px
+        fill(0);
+        rect(x, mouthY, 1, 2);
+      }
+      break;
+  }
+}
+
+// 辅助函数：判断y是否在曲线上（用于绘制微笑/难过的嘴）
+boolean yInCurve(int x, int centerX, int centerY, int range, float curve) {
+  int dx = x - centerX;
+  if (abs(dx) > range) return false; // 超出嘴的宽度范围
+  int y = getYPos(x, centerX, centerY, range, curve);
+  return y >= 0 && y < height;
+}
+
+// 辅助函数：计算曲线上的y坐标（二次曲线）
+int getYPos(int x, int centerX, int centerY, int range, float curve) {
+  int dx = x - centerX;
+  return centerY + int(curve * dx * dx); // 二次函数曲线：y = a*x² + b
+}
+
+// 绘制移动的黑色条纹（遮挡不需要的列，只显示当前帧）
+void drawMovingStripes() {
+  fill(0, 200); // 半透明黑色条纹（200是透明度，0完全透明，255完全不透明）
+  noStroke();
+  for (int x = 0; x < width; x++) {
+    // 计算当前列是否需要被条纹遮挡（根据偏移量）
+    int currentCol = int(x - offset) % frameCount;
+    if (currentCol < 0) currentCol += frameCount; // 处理负数取模
+    if (currentCol != 0) { // 只显示第0列（随偏移移动，等效于切换帧）
+      rect(x, 0, 1, height); // 遮挡当前列
+    }
+  }
+}
+
+// 鼠标移动控制速度
+void mouseMoved() {
+  speed = map(mouseX, 0, width, -1, 1); // 速度范围：-1（左移）到1（右移）
+}
+
+// 鼠标点击反转方向
+void mousePressed() {
+  speed *= -1;
+}
